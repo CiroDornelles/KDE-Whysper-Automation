@@ -241,6 +241,79 @@ def process_audio_batch_parallel(audio_paths, model_size="base", language=None, 
             print(f"  - {f['file']}: {f['error']}")
 
 
+def convert_audio_for_diarization(audio_path):
+    """
+    Convert audio file to a format compatible with diarization (16kHz, mono).
+    
+    Args:
+        audio_path (str): Path to the original audio file
+    
+    Returns:
+        str: Path to the converted audio file (or original file if no conversion needed)
+    """
+    import os
+    import subprocess
+    import tempfile
+    from pathlib import Path
+    
+    try:
+        # Check the audio properties using ffprobe
+        result = subprocess.run([
+            'ffprobe', '-v', 'quiet', '-show_streams', '-select_streams', 'a:0', audio_path
+        ], capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            print(f"Warning: Could not probe audio file {audio_path}, using original file")
+            return audio_path
+        
+        # Parse the ffprobe output to get sample rate and channels
+        lines = result.stdout.split('\n')
+        sample_rate = None
+        channels = None
+        
+        for line in lines:
+            if line.startswith('sample_rate='):
+                sample_rate = int(line.split('=')[1])
+            elif line.startswith('channels='):
+                channels = int(line.split('=')[1])
+        
+        # Check if conversion is needed
+        needs_conversion = False
+        if sample_rate is None or sample_rate != 16000:
+            needs_conversion = True
+        if channels is None or channels != 1:
+            needs_conversion = True
+        
+        if not needs_conversion:
+            # File is already in compatible format
+            return audio_path
+        
+        # Create temporary file for converted audio with .wav extension
+        temp_dir = tempfile.gettempdir()
+        basename = os.path.splitext(os.path.basename(audio_path))[0]
+        temp_filename = os.path.join(temp_dir, f"temp_diarization_{basename}.wav")
+        
+        # Convert audio using ffmpeg
+        convert_result = subprocess.run([
+            'ffmpeg', '-y', '-i', audio_path,
+            '-ar', '16000',  # Set sample rate to 16kHz
+            '-ac', '1',     # Set to mono
+            '-c:a', 'pcm_s16le',  # Use PCM S16LE codec (most compatible)
+            temp_filename
+        ], capture_output=True, text=True)
+        
+        if convert_result.returncode == 0:
+            print(f"Audio converted for diarization: {audio_path} -> {temp_filename}")
+            return temp_filename
+        else:
+            print(f"Failed to convert audio for diarization, using original: {convert_result.stderr}")
+            return audio_path
+            
+    except Exception as e:
+        print(f"Error converting audio for diarization: {str(e)}, using original file")
+        return audio_path
+
+
 def diarize_audio(audio_path, huggingface_token=None):
     """
     Perform speaker diarization on the audio file to identify who spoke when.
@@ -255,6 +328,9 @@ def diarize_audio(audio_path, huggingface_token=None):
     try:
         import torch
         from pyannote.audio import Pipeline
+        
+        # Convert audio to compatible format if needed
+        converted_audio_path = convert_audio_for_diarization(audio_path)
         
         # Load the diarization pipeline
         if huggingface_token:
@@ -273,10 +349,20 @@ def diarize_audio(audio_path, huggingface_token=None):
             print("Using CPU for diarization")
         
         # Apply the pipeline to the audio file
-        print(f"Diarizing audio: {audio_path}")
-        diarization = pipeline(audio_path)
+        print(f"Diarizing audio: {converted_audio_path}")
+        diarization = pipeline(converted_audio_path)
         
         print("Diarization completed.")
+        
+        # Clean up temporary file if it was created
+        if converted_audio_path != audio_path:
+            import os
+            try:
+                os.remove(converted_audio_path)
+                print(f"Temporary converted audio file cleaned up: {converted_audio_path}")
+            except:
+                pass  # Ignore errors when cleaning up temporary file
+        
         return diarization
     except ImportError:
         print("Warning: pyannote.audio not installed. Diarization will be skipped.")
