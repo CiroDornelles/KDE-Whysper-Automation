@@ -482,7 +482,30 @@ def process_audio_batch(audio_paths, model_size="base", language=None, translate
                 
                 # Handle output based on format
                 if output_format == "txt":
-                    output_content = result["text"]
+                    # Check if diarization was performed
+                    if diarize and "segments" in result and len(result["segments"]) > 0:
+                        # Check if the first segment has speaker information
+                        if "speakers" in result["segments"][0]:
+                            # Create a diarized transcript
+                            output_content = ""
+                            for i, segment in enumerate(result["segments"]):
+                                start_time = segment["start"]
+                                end_time = segment["end"]
+                                text = segment["text"].strip()
+                                
+                                # Get speaker information
+                                speakers = segment.get("speakers", [])
+                                if speakers:
+                                    speaker = speakers[0]["speaker"]
+                                else:
+                                    speaker = "SPEAKER_UNKNOWN"
+                                
+                                # Format: [start_time - end_time] SPEAKER: text
+                                output_content += f"[{start_time:.2f}s - {end_time:.2f}s] {speaker}: {text}\n"
+                        else:
+                            output_content = result["text"]
+                    else:
+                        output_content = result["text"]
                 elif output_format in ["srt", "vtt", "tsv"]:
                     # Create a temporary directory for the writer
                     with tempfile.TemporaryDirectory() as temp_dir:
@@ -696,7 +719,30 @@ def main():
             
             # Handle output based on format
             if args.output_format == "txt":
-                output_content = result["text"]
+                # Check if diarization was performed
+                if args.diarize and "segments" in result and len(result["segments"]) > 0:
+                    # Check if the first segment has speaker information
+                    if "speakers" in result["segments"][0]:
+                        # Create a diarized transcript
+                        output_content = ""
+                        for i, segment in enumerate(result["segments"]):
+                            start_time = segment["start"]
+                            end_time = segment["end"]
+                            text = segment["text"].strip()
+                            
+                            # Get speaker information
+                            speakers = segment.get("speakers", [])
+                            if speakers:
+                                speaker = speakers[0]["speaker"]
+                            else:
+                                speaker = "SPEAKER_UNKNOWN"
+                            
+                            # Format: [start_time - end_time] SPEAKER: text
+                            output_content += f"[{start_time:.2f}s - {end_time:.2f}s] {speaker}: {text}\n"
+                    else:
+                        output_content = result["text"]
+                else:
+                    output_content = result["text"]
             elif args.output_format in ["srt", "vtt", "tsv"]:
                 # Create a temporary directory for the writer
                 with tempfile.TemporaryDirectory() as temp_dir:

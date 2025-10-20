@@ -2,16 +2,17 @@
 
 # Script wrapper para executar a transcrição com STT Whisper.
 # Ele lida com a navegação de diretório, ambiente virtual e notificações.
+# Agora também suporta arquivos de vídeo, convertendo-os para áudio antes da transcrição.
 
 # --- CONFIGURAÇÃO ---
+PROJECT_DIR="/home/ciro/Documentos/scripts/STT"
+VENV_UV_RUN="/usr/sbin/uv run"
+MAIN_SCRIPT="$PROJECT_DIR/main.py"
+
 # Carregar variáveis de ambiente do arquivo .env
 if [ -f "$PROJECT_DIR/.env" ]; then
   source "$PROJECT_DIR/.env"
 fi
-
-PROJECT_DIR="/home/ciro/Documentos/scripts/STT"
-VENV_UV_RUN="/usr/sbin/uv run"
-MAIN_SCRIPT="$PROJECT_DIR/main.py"
 # --- FIM DA CONFIGURAÇÃO ---
 
 
@@ -28,6 +29,38 @@ FILE_PATH=$3
 # Obter o diretório e o nome do arquivo do caminho completo
 INPUT_DIR=$(dirname "$FILE_PATH")
 FILENAME=$(basename "$FILE_PATH")
+
+# --- VERIFICAÇÃO DE TIPO DE ARQUIVO ---
+# Detectar se é um arquivo de vídeo e converter para áudio
+EXTENSION="${FILENAME##*.}"
+VIDEO_EXTENSIONS=("mp4" "avi" "mov" "mkv" "wmv" "flv" "webm" "m4v" "mpg" "mpeg" "3gp" "3g2" "mxf" "mts" "m2ts")
+
+# Variável para controlar se precisamos converter o vídeo
+NEEDS_CONVERSION=false
+VIDEO_AUDIO_FILE=""
+
+for video_ext in "${VIDEO_EXTENSIONS[@]}"; do
+    if [ "$EXTENSION" = "$video_ext" ]; then
+        NEEDS_CONVERSION=true
+        VIDEO_AUDIO_FILE="$(mktemp --suffix=.wav)"
+        break
+    fi
+done
+
+# --- CONVERSÃO DE VÍDEO PARA ÁUDIO, SE NECESSÁRIO ---
+if [ "$NEEDS_CONVERSION" = true ]; then
+    notify-send "STT Whisper" "Convertendo vídeo para áudio: '$FILENAME'..."
+    
+    # Converter vídeo para áudio usando ffmpeg
+    if ! ffmpeg -i "$FILE_PATH" -acodec pcm_s16le -ar 16000 -ac 1 "$VIDEO_AUDIO_FILE" 2>/dev/null; then
+        notify-send "STT Whisper - Erro" "Falha ao converter vídeo para áudio."
+        exit 1
+    fi
+    
+    # Atualizar o FILE_PATH para o arquivo de áudio convertido
+    FILE_PATH="$VIDEO_AUDIO_FILE"
+    FILENAME=$(basename "$FILE_PATH")
+fi
 
 # --- CONSTRUÇÃO DO COMANDO ---
 # Navegar para o diretório do PROJETO para que 'uv' encontre o ambiente.
@@ -61,4 +94,10 @@ if $VENV_UV_RUN "$MAIN_SCRIPT" "${CMD_ARGS[@]}" > /dev/null 2>> "$LOG_FILE"; the
     notify-send "STT Whisper" "Transcrição de '$FILENAME' concluída com sucesso!"
 else
     notify-send "STT Whisper - Erro" "Ocorreu um erro ao transcrever '$FILENAME'."
+fi
+
+# --- LIMPEZA ---
+# Remover o arquivo de áudio temporário, se foi criado a partir de um vídeo
+if [ "$NEEDS_CONVERSION" = true ] && [ -f "$VIDEO_AUDIO_FILE" ]; then
+    rm "$VIDEO_AUDIO_FILE"
 fi
