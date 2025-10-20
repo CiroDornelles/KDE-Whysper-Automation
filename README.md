@@ -147,4 +147,4 @@ Os arquivos de menu de serviço são instalados automaticamente no diretório `~
 
 ## Autores
 
-- Ciro Silva
+- Ciro Dornelles
