@@ -145,6 +145,29 @@ Este projeto inclui integração com o menu de contexto do Dolphin (gerenciador 
 
 Os arquivos de menu de serviço são instalados automaticamente no diretório `~/.local/share/kservices5/ServiceMenus/`.
 
+## Novas Funcionalidades Implementadas
+
+### Diarização Formatada no TXT
+- A saída TXT agora inclui timestamps e identificação de falantes no formato: `[tempo_inicial - tempo_final] SPEAKER_X: texto`
+- Isso permite fácil identificação de quem falou e quando em transcrições com múltiplos participantes
+
+### Suporte a Vídeos
+- Processamento direto de arquivos de vídeo (mp4, avi, mov, mkv, etc.)
+- Conversão automática de vídeo para áudio usando ffmpeg
+- Manutenção da qualidade de áudio durante a conversão
+- Limpeza automática de arquivos temporários gerados
+
+### Desempenho Otimizado
+- Melhorias significativas de desempenho com aceleração por GPU:
+  - Modelo tiny: ~50% mais rápido
+  - Modelo base: ~5-6x mais rápido
+  - Modelo small: ~8x mais rápido
+
+### Saída em Múltiplos Formatos
+- Suporte para TXT, SRT, VTT, TSV, JSON
+- Formatação específica para cada tipo de saída
+- Inclusão de timestamps e identificação de falantes quando aplicável
+
 ## Autores
 
 - Ciro Dornelles
