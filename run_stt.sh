@@ -4,8 +4,11 @@
 # Ele lida com a navegação de diretório, ambiente virtual e notificações.
 
 # --- CONFIGURAÇÃO ---
-# O usuário DEVE definir seu token do Hugging Face aqui para a diarização funcionar.
-HF_TOKEN="YOUR_HUGGING_FACE_TOKEN"
+# Carregar variáveis de ambiente do arquivo .env
+if [ -f "$PROJECT_DIR/.env" ]; then
+  source "$PROJECT_DIR/.env"
+fi
+
 PROJECT_DIR="/home/ciro/Documentos/scripts/STT"
 VENV_UV_RUN="/usr/sbin/uv run"
 MAIN_SCRIPT="$PROJECT_DIR/main.py"
@@ -36,9 +39,9 @@ cd "$PROJECT_DIR" || exit
 CMD_ARGS=("$FILE_PATH" --model "$MODEL" --output-format "txt" --output-dir "$INPUT_DIR")
 
 if [ "$DIARIZE" = "true" ]; then
-    # Se o token não foi alterado, avise o usuário e saia
-    if [ "$HF_TOKEN" = "YOUR_HUGGING_FACE_TOKEN" ]; then
-        notify-send "STT Whisper - Erro de Configuração" "O token do Hugging Face não foi definido no script run_stt.sh. A diarização não pode continuar."
+    # Se o token não foi definido no .env, avise o usuário e saia
+    if [ -z "$HF_TOKEN" ] || [ "$HF_TOKEN" = "YOUR_HUGGING_FACE_TOKEN_HERE" ]; then
+        notify-send "STT Whisper - Erro de Configuração" "O token HF_TOKEN não foi definido no arquivo .env. A diarização não pode continuar."
         exit 1
     fi
     CMD_ARGS+=(--diarize --hf-token "$HF_TOKEN")
